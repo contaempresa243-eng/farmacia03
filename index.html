@@ -1360,15 +1360,20 @@ function escaparHTML(texto) {
         });
 
         // Função central para carregar a aplicação após autenticação
+        async function etapa(nome, fn) {
+            try { return await fn(); }
+            catch (e) { e.message = '[' + nome + '] ' + (e && e.message ? e.message : e); throw e; }
+        }
+
         async function iniciarAplicacao(firebaseUser) {
             try {
-                let doc = await db.collection('utilizadores').doc(firebaseUser.uid).get();
+                let doc = await etapa('ler o teu perfil (utilizadores)', () => db.collection('utilizadores').doc(firebaseUser.uid).get());
 
                 // Primeiro acesso da instalação: se ainda não existe a marca "instalado",
                 // a primeira conta a entrar torna-se ADMIN. Depois disso esta via fica fechada
                 // (as regras do Firestore também a bloqueiam).
                 if (!doc.exists) {
-                    const marca = await db.collection('configuracoes').doc('instalado').get();
+                    const marca = await etapa('ler a marca instalado (configuracoes)', () => db.collection('configuracoes').doc('instalado').get());
                     if (!marca.exists) {
                         const emailConta = firebaseUser.email || '';
                         await db.collection('utilizadores').doc(firebaseUser.uid).set({
@@ -1407,15 +1412,15 @@ aplicarPermissoes(tipoUtilizador);
                 document.getElementById('tela-login').classList.add('hidden');
                 document.getElementById('app-principal').classList.remove('hidden');
 
-                await carregarConfiguracoesGerais();
-                await carregarDadosDashboard();
-                await carregarListaProdutos();
-                await carregarListaUtilizadores();
+                await etapa('configuracoes gerais', () => carregarConfiguracoesGerais());
+                await etapa('painel (produtos)', () => carregarDadosDashboard());
+                await etapa('lista de produtos', () => carregarListaProdutos());
+                await etapa('lista de utilizadores', () => carregarListaUtilizadores());
                 inicializarGraficos();
 
                 // Executar verificação de backup automático (apenas para Admin)
                 if (tipoUtilizador === 'admin') {
-                    await verificarEExecutarBackup();
+                    await etapa('copia de seguranca (produtos/vendas/utilizadores)', () => verificarEExecutarBackup());
                 }
 
             } catch (erro) {
